@@ -95,22 +95,6 @@ namespace NeuralNetwork
             }
         }
 
-        public void ShowResult(double[] input)
-        {
-            double[] result = GetResult(input);
-            Console.Write("Result for: [");// + input[0] + "," + input[1] + "]");
-            for (int i = 0; i < input.Length; i++)
-            {
-                Console.Write((i > 0 ? ", " : "") + input[i]);
-            }
-            Console.WriteLine("]");
-
-            for (int i = 0; i < m_NumOutput; i++)
-            {
-                Console.WriteLine(i + ": " + Math.Round(result[i], 3, MidpointRounding.AwayFromZero));
-            }
-        }
-
         public double[] GetResult(double[] input)
         {
             if (input.Length != m_NumInput)
@@ -167,6 +151,14 @@ namespace NeuralNetwork
                 for (int j = 0; j < m_NumOutputWeights; j++)
                 {
                     m_OutputWeightGradients[k, j] = m_LearningRate * m_OutputGradients[k] * (j > 0 ? m_HiddenOutputs[j - 1] : 1);
+
+                    //Update weight
+                    m_OutputWeights[k, j] += m_OutputWeightGradients[k, j];
+
+                    //Add momentum
+                    m_OutputWeights[k, j] += MOMENTUM * m_PrevOutputWeightGradients[k, j];
+
+                    m_PrevOutputWeightGradients[k, j] = m_OutputWeightGradients[k, j];
                 }
             }
 
@@ -188,28 +180,8 @@ namespace NeuralNetwork
                 for (int i = 0; i < m_NumHiddenWeights; i++)
                 {
                     m_HiddenWeightGradients[j, i] = m_LearningRate * m_HiddenGradients[j] * (i > 0 ? m_Inputs[i-1] : 1);
-                }
-            }
 
-            //Update output layer weights
-            for (int k = 0; k < m_NumOutput; k++)
-            {
-                for (int j = 0; j < m_NumOutputWeights; j++)
-                {
-                    m_OutputWeights[k, j] += m_OutputWeightGradients[k, j];
-
-                    //Add momentum
-                    m_OutputWeights[k, j] += MOMENTUM * m_PrevOutputWeightGradients[k, j];
-                    
-                    m_PrevOutputWeightGradients[k, j] = m_OutputWeightGradients[k, j];
-                }
-            }
-
-            //Update hidden layer weights
-            for (int j = 0; j < m_NumHidden; j++)
-            {
-                for (int i = 0; i < m_NumHiddenWeights; i++)
-                {
+                    //Update weight
                     m_HiddenWeights[j, i] += m_HiddenWeightGradients[j, i];
 
                     //Add momentum

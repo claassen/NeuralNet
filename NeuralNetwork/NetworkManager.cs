@@ -78,7 +78,6 @@ namespace NeuralNetwork
                     Console.WriteLine(Math.Round(result[j], 3, MidpointRounding.AwayFromZero));
                 }
 
-                //m_Network.ShowResult(example.Input);
                 Console.WriteLine("Expected: ");
                 for (int j = 0; j < example.Expected.Length; j++)
                 {
