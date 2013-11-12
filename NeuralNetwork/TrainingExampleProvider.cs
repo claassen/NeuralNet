@@ -8,7 +8,7 @@ namespace NeuralNetwork
     public abstract class ITrainingSetProvider
     {
         public abstract List<TrainingExample> GetTrainingExamples();
-        public List<TrainingExample> GetTestingExamples()
+        public virtual List<TrainingExample> GetTestingExamples()
         {
             return GetTrainingExamples();
         }
@@ -114,7 +114,7 @@ namespace NeuralNetwork
 
     public class EvenOrOddTrainingSetProvider : ITrainingSetProvider
     {
-        public static int InputSize_ = 5;
+        public static int InputSize_ = 4;
 
         public static List<TrainingExample> GetRandomExamples(int count)
         {
@@ -151,7 +151,7 @@ namespace NeuralNetwork
             return GetRandomExamples(1000);
         }
 
-        public List<TrainingExample> GetTestingExamples()
+        public override List<TrainingExample> GetTestingExamples()
         {
             return GetRandomExamples(20);
         }
@@ -193,7 +193,7 @@ namespace NeuralNetwork
             return GetSinExamples(1000);
         }
 
-        public List<TrainingExample> GetTestingExamples()
+        public override List<TrainingExample> GetTestingExamples()
         {
             return GetSinExamples(100);
         }

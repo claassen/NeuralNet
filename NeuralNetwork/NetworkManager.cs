@@ -12,12 +12,12 @@ namespace NeuralNetwork
         private NeuralNetwork m_Network;
         private Random m_Rand;
 
-        public NetworkManager(ITrainingSetProvider trainingSetProvider, int numHiddenNodes, ActivationFunction outputActivationFunction, ActivationFunction hiddenActivationFunction, double learningRate)
+        public NetworkManager(ITrainingSetProvider trainingSetProvider, InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer, double learningRate = 0.25)
         {
             m_TrainingSetProvider = trainingSetProvider;
             m_TrainingExamples = trainingSetProvider.GetTrainingExamples();
 
-            m_Network = new NeuralNetwork(m_TrainingSetProvider.InputSize(), m_TrainingSetProvider.ResultSize(), numHiddenNodes, outputActivationFunction, hiddenActivationFunction, learningRate);
+            m_Network = new NeuralNetwork(inputLayer, hiddenLayers, outputLayer, learningRate);
 
             m_Rand = new Random(DateTime.Now.Millisecond);
         }
@@ -33,19 +33,19 @@ namespace NeuralNetwork
             {
                 TrainingExample example = GetRandomTrainingExample();
                 m_Network.Train(example.Input, example.Expected);
-                
+
                 if (interactive)
                 {
-                    m_Network.PrettyDisplay();
+                    //m_Network.PrettyDisplay();
                     Console.ReadLine();
                 }
             }
         }
 
-        public void ShowNetwork()
-        {
-            m_Network.PrettyDisplay();
-        }
+        //public void ShowNetwork()
+        //{
+        //    m_Network.PrettyDisplay();
+        //}
 
         public void TestNetwork()
         {
