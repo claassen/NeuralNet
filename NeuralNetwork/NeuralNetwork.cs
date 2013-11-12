@@ -76,11 +76,6 @@ namespace NeuralNetwork
 
         /*
          * Trains the neural network using the given training example. ("Online" training)
-         * 
-         * Variable names in loops follow the convention that they represent the following layers:
-         * k = output layer
-         * j = hidden layer
-         * i = input layer
          */
         public void Train(double[] input, double[] expected)
         {
