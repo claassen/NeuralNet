@@ -62,16 +62,14 @@ namespace NeuralNetwork
 
         public double[] GetResult(double[] input)
         {
-            double[] result = HiddenLayers[0].Evaluate(InputLayer.Evaluate(input));
+            double[] result = InputLayer.Evaluate(input);
 
-            for (int i = 1; i < HiddenLayers.Count; i++)
+            for (int i = 0; i < HiddenLayers.Count; i++)
             {
                 result = HiddenLayers[i].Evaluate(result);
             }
 
-            result = OutputLayer.Evaluate(result);
-
-            return result;
+            return OutputLayer.Evaluate(result);
         }
 
         /*
@@ -82,86 +80,71 @@ namespace NeuralNetwork
             double[] actual = GetResult(input);
 
             //Output nodes
-            for (int i = 0; i < OutputLayer.NumNodes; i++)
-            {
-                OutputLayer.OutputGradients[i] = (expected[i] - actual[i]) * OutputLayer.ActivationFunction.Derivative(actual[i]);
-
-                for (int j = 0; j < OutputLayer.NumWeightsPerNode; j++)
-                {
-                    OutputLayer.WeightGradients[i, j] = m_LearningRate * OutputLayer.OutputGradients[i] * (j == 0 ? 1 : HiddenLayers.Last().Outputs[j - 1]);
-                    OutputLayer.Weights[i, j] += OutputLayer.WeightGradients[i, j];
-                    OutputLayer.Weights[i, j] += MOMENTUM * OutputLayer.PrevWeightGradients[i, j];
-                    OutputLayer.PrevWeightGradients[i, j] = OutputLayer.WeightGradients[i, j];
-                }
-            }
-
+            OutputLayer.Backpropagate(actual, expected, HiddenLayers.Last().Outputs, m_LearningRate, MOMENTUM);
+            
             Layer previous = OutputLayer;
 
+            //Hidden nodes
             for (int i = HiddenLayers.Count - 1; i >= 0; i--)
             {
-                Layer layer = HiddenLayers[i];
+                HiddenLayer layer = HiddenLayers[i];
                 Layer next = (i == 0 ? (Layer)InputLayer : (Layer)HiddenLayers[i - 1]);
 
-                for (int j = 0; j < layer.NumNodes; j++)
-                {
-                    double outputGradientSum = 0;
-                    for (int k = 0; k < previous.NumNodes; k++)
-                    {
-                        outputGradientSum += previous.OutputGradients[k] * layer.Outputs[j];
-                    }
-
-                    layer.OutputGradients[j] = layer.ActivationFunction.Derivative(layer.Outputs[j]) * outputGradientSum;
-
-                    for (int k = 0; k < layer.NumWeightsPerNode; k++)
-                    {
-                        layer.WeightGradients[j, k] = m_LearningRate * layer.OutputGradients[j] * (k == 0 ? 1 : next.Outputs[k - 1]);
-                        layer.Weights[j, k] += layer.WeightGradients[j, k];
-                        layer.Weights[j, k] += MOMENTUM * layer.PrevWeightGradients[j, k];
-                        layer.PrevWeightGradients[j, k] = layer.WeightGradients[j, k];
-                    }
-                }
+                layer.Backpropagate(previous.OutputGradients, next.Outputs, m_LearningRate, MOMENTUM);
 
                 previous = layer;
             }
         }
 
-        //public void PrettyDisplay()
-        //{
-        //    Console.WriteLine("\n::OUTPUT LAYER::\n");
-        //    for (int i = 0; i < m_NumOutput; i++)
-        //    {
-        //        Console.WriteLine("OUTPUT NODE " + i + 1);
-        //        Console.WriteLine("OUTPUT: " + m_OutputOutputs[i]);
-        //        Console.Write("WEIGHTS: ");
-        //        for (int j = 0; j < m_NumOutputWeights; j++)
-        //        {
-        //            Console.Write(m_OutputWeights[i,j] + " ");
-        //        }
-        //        Console.Write("\nGRADIENTS: ");
-        //        for (int j = 0; j < m_NumOutputWeights; j++)
-        //        {
-        //            Console.Write(m_OutputWeightGradients[i,j] + " ");
-        //        }
-        //        Console.WriteLine("\n");
-        //    }
+        public void DisplayNetwork()
+        {
+            Console.WriteLine("\n::OUTPUT LAYER::\n");
+            for (int i = 0; i < OutputLayer.NumNodes; i++)
+            {
+                Console.WriteLine("OUTPUT NODE " + (i + 1));
+                Console.WriteLine("OUTPUT: " + Math.Round(OutputLayer.Outputs[i], 3, MidpointRounding.AwayFromZero));
+                Console.Write("WEIGHTS: ");
+                for (int j = 0; j < OutputLayer.NumWeightsPerNode; j++)
+                {
+                    Console.Write(Math.Round(OutputLayer.Weights[i, j], 3, MidpointRounding.AwayFromZero) + " ");
+                }
+                Console.Write("\nGRADIENTS: ");
+                for (int j = 0; j < OutputLayer.NumWeightsPerNode; j++)
+                {
+                    Console.Write(Math.Round(OutputLayer.WeightGradients[i, j], 3, MidpointRounding.AwayFromZero) + " ");
+                }
+                Console.WriteLine("\n");
+            }
 
-        //    Console.WriteLine("\n::HIDDEN LAYER::\n");
-        //    for (int i = 0; i < m_NumHidden; i++)
-        //    {
-        //        Console.WriteLine("HIDDEN NODE " + i + 1);
-        //        Console.WriteLine("OUTPUT: " + m_HiddenOutputs[i]);
-        //        Console.Write("WEIGHTS: ");
-        //        for (int j = 0; j < m_NumHiddenWeights; j++)
-        //        {
-        //            Console.Write(m_HiddenWeights[i,j] + " ");
-        //        }
-        //        Console.Write("\nGRADIENTS: ");
-        //        for (int j = 0; j < m_NumHiddenWeights; j++)
-        //        {
-        //            Console.Write(m_HiddenWeightGradients[i, j] + " ");
-        //        }
-        //        Console.WriteLine("\n");
-        //    }
-        //}
+            for (int k = HiddenLayers.Count - 1; k >= 0; k--)
+            {
+                HiddenLayer layer = HiddenLayers[k];
+                Console.WriteLine("\n::HIDDEN LAYER " + (k + 1) + "::\n");
+                for (int i = 0; i < layer.NumNodes; i++)
+                {
+                    Console.WriteLine("HIDDEN NODE " + (i + 1));
+                    Console.WriteLine("OUTPUT: " + Math.Round(layer.Outputs[i], 3, MidpointRounding.AwayFromZero));
+                    Console.Write("WEIGHTS: ");
+                    for (int j = 0; j < layer.NumWeightsPerNode; j++)
+                    {
+                        Console.Write(Math.Round(layer.Weights[i, j], 3, MidpointRounding.AwayFromZero) + " ");
+                    }
+                    Console.Write("\nGRADIENTS: ");
+                    for (int j = 0; j < layer.NumWeightsPerNode; j++)
+                    {
+                        Console.Write(Math.Round(layer.WeightGradients[i, j], 3, MidpointRounding.AwayFromZero) + " ");
+                    }
+                    Console.WriteLine("\n");
+                }
+            }
+
+            Console.WriteLine("\n::INPUT LAYER::\n");
+            Console.WriteLine("OUTPUTS (INPUTS):");
+            for (int i = 0; i < InputLayer.NumNodes; i++)
+            {
+                Console.Write(Math.Round(InputLayer.Outputs[i], 3, MidpointRounding.AwayFromZero) + " ");
+            }
+            Console.WriteLine("\n");
+        }
     }
 }

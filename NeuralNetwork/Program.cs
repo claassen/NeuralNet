@@ -10,11 +10,11 @@ namespace NeuralNetwork
         static void Main(string[] args)
         {
             //SameOrDifferent();
-            LogicalAnd();
+            //LogicalAnd();
             //LogicalOr();
             //LogicalXOr();
             //EvenOrOdd();   //nope
-            //SinFunction();
+            SinFunction();
         }
 
         static void SameOrDifferent()
@@ -33,7 +33,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(1000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }
@@ -54,7 +54,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(1000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }
@@ -75,7 +75,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(1000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }
@@ -96,7 +96,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(1000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }
@@ -117,7 +117,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(10000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }
@@ -138,7 +138,7 @@ namespace NeuralNetwork
             Console.WriteLine("Training...");
             manager.TrainNetwork(10000000, false);
 
-            //manager.ShowNetwork();
+            manager.ShowNetwork();
 
             manager.TestNetwork();
         }

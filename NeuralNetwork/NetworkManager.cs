@@ -36,16 +36,16 @@ namespace NeuralNetwork
 
                 if (interactive)
                 {
-                    //m_Network.PrettyDisplay();
+                    m_Network.DisplayNetwork();
                     Console.ReadLine();
                 }
             }
         }
 
-        //public void ShowNetwork()
-        //{
-        //    m_Network.PrettyDisplay();
-        //}
+        public void ShowNetwork()
+        {
+            m_Network.DisplayNetwork();
+        }
 
         public void TestNetwork()
         {

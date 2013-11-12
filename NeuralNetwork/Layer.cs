@@ -66,9 +66,25 @@ namespace NeuralNetwork
 
     public class OutputLayer : Layer
     {
-        public OutputLayer(ActivationFunction activationFunction, int numNodes) 
+        public OutputLayer(ActivationFunction activationFunction, int numNodes)
             : base(activationFunction, numNodes)
         {
+        }
+
+        public void Backpropagate(double[] actual, double[] expected, double[] nextOutputs, double learningRate, double momentum)
+        {
+            for (int i = 0; i < NumNodes; i++)
+            {
+                OutputGradients[i] = (expected[i] - actual[i]) * ActivationFunction.Derivative(actual[i]);
+
+                for (int j = 0; j < NumWeightsPerNode; j++)
+                {
+                    WeightGradients[i, j] = learningRate * OutputGradients[i] * (j == 0 ? 1 : nextOutputs[j - 1]);
+                    Weights[i, j] += WeightGradients[i, j];
+                    Weights[i, j] += momentum * PrevWeightGradients[i, j];
+                    PrevWeightGradients[i, j] = WeightGradients[i, j];
+                }
+            }
         }
     }
 
@@ -79,6 +95,28 @@ namespace NeuralNetwork
         public HiddenLayer(ActivationFunction activationFunction, int numNodes)
             : base(activationFunction, numNodes)
         {
+        }
+
+        public void Backpropagate(double[] prevOutputGradients, double[] nextOutputs, double learningRate, double momentum)
+        {
+            for (int j = 0; j < NumNodes; j++)
+            {
+                double outputGradientSum = 0;
+                for (int k = 0; k < prevOutputGradients.Length; k++)
+                {
+                    outputGradientSum += prevOutputGradients[k] * Outputs[j];
+                }
+
+                OutputGradients[j] = ActivationFunction.Derivative(Outputs[j]) * outputGradientSum;
+
+                for (int k = 0; k < NumWeightsPerNode; k++)
+                {
+                    WeightGradients[j, k] = learningRate * OutputGradients[j] * (k == 0 ? 1 : nextOutputs[k - 1]);
+                    Weights[j, k] += WeightGradients[j, k];
+                    Weights[j, k] += momentum * PrevWeightGradients[j, k];
+                    PrevWeightGradients[j, k] = WeightGradients[j, k];
+                }
+            }
         }
     }
 
