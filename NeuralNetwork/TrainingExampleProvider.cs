@@ -114,7 +114,7 @@ namespace NeuralNetwork
 
     public class EvenOrOddTrainingSetProvider : ITrainingSetProvider
     {
-        public static int InputSize_ = 4;
+        public static int InputSize_ = 7;
 
         public static List<TrainingExample> GetRandomExamples(int count)
         {

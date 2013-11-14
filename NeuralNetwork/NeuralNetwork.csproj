@@ -44,11 +44,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActivationFunctions.cs" />
+    <Compile Include="FeatureMap.cs" />
     <Compile Include="Layer.cs" />
     <Compile Include="NetworkManager.cs" />
     <Compile Include="NeuralNetwork.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization.cs" />
     <Compile Include="TrainingExample.cs" />
     <Compile Include="TrainingExampleProvider.cs" />
   </ItemGroup>

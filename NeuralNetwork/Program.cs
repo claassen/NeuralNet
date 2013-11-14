@@ -13,8 +13,8 @@ namespace NeuralNetwork
             //LogicalAnd();
             //LogicalOr();
             //LogicalXOr();
-            //EvenOrOdd();   //nope
-            SinFunction();
+            EvenOrOdd();   //nope
+            //SinFunction();
         }
 
         static void SameOrDifferent()
@@ -25,9 +25,9 @@ namespace NeuralNetwork
                                                         new InputLayer(2),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Tanh, 10)
+                                                            new HiddenLayer(ActivationFunctionType.Tanh, 10)
                                                         },
-                                                        new OutputLayer(ActivationFunctions.Tanh, 1),
+                                                        new OutputLayer(ActivationFunctionType.Tanh, 1),
                                                         0.05);
 
             Console.WriteLine("Training...");
@@ -46,9 +46,9 @@ namespace NeuralNetwork
                                                         new InputLayer(2),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Sigmoid, 10)
-                                                        }, 
-                                                        new OutputLayer(ActivationFunctions.Sigmoid, 1),
+                                                            new HiddenLayer(ActivationFunctionType.Sigmoid, 10)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.05);
 
             Console.WriteLine("Training...");
@@ -67,9 +67,9 @@ namespace NeuralNetwork
                                                         new InputLayer(2),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Sigmoid, 10)
-                                                        }, 
-                                                        new OutputLayer(ActivationFunctions.Sigmoid, 1),
+                                                            new HiddenLayer(ActivationFunctionType.Sigmoid, 10)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.05);
 
             Console.WriteLine("Training...");
@@ -88,9 +88,9 @@ namespace NeuralNetwork
                                                         new InputLayer(2),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Sigmoid, 10)
-                                                        }, 
-                                                        new OutputLayer(ActivationFunctions.Sigmoid, 1),
+                                                            new HiddenLayer(ActivationFunctionType.Sigmoid, 10)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.05);
 
             Console.WriteLine("Training...");
@@ -106,16 +106,17 @@ namespace NeuralNetwork
             ITrainingSetProvider trainingSetProvider = new EvenOrOddTrainingSetProvider();
 
            NetworkManager manager = new NetworkManager(trainingSetProvider,
-                                                        new InputLayer(4),
+                                                        new InputLayer(7),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Sigmoid, 50)
-                                                        }, 
-                                                        new OutputLayer(ActivationFunctions.Sigmoid, 1),
+                                                            new ConvolutionalLayer(ActivationFunctionType.Sigmoid, 2, 3),
+                                                            new HiddenLayer(ActivationFunctionType.Sigmoid, 50)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.25);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(10000000, false);
+            manager.TrainNetwork(10000, false); //+3
 
             manager.ShowNetwork();
 
@@ -130,9 +131,9 @@ namespace NeuralNetwork
                                                         new InputLayer(1),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new HiddenLayer(ActivationFunctions.Sigmoid, 20)
-                                                        }, 
-                                                        new OutputLayer(ActivationFunctions.Sigmoid, 1),
+                                                            new HiddenLayer(ActivationFunctionType.Sigmoid, 20)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.25);
 
             Console.WriteLine("Training...");

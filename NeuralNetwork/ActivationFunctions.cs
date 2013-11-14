@@ -5,6 +5,12 @@ using System.Text;
 
 namespace NeuralNetwork
 {
+    public enum ActivationFunctionType
+    {
+        Sigmoid = 1,
+        Tanh = 2
+    }
+
     public class ActivationFunction
     {
         public Func<double, double> Function
@@ -22,6 +28,16 @@ namespace NeuralNetwork
 
     public static class ActivationFunctions
     {
+        public static ActivationFunction Get(ActivationFunctionType type)
+        {
+            switch (type)
+            {
+                case ActivationFunctionType.Sigmoid: return ActivationFunctions.Sigmoid;
+                case ActivationFunctionType.Tanh: return ActivationFunctions.Tanh;
+                default: return null;
+            }
+        }
+
         public static ActivationFunction Sigmoid = new ActivationFunction()
         {
             Function = (double x) =>
