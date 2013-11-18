@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
+using System.IO;
 
 namespace NeuralNetwork
 {
     [Serializable]
     public class NeuralNetwork
     {
+        public string Name;
         public InputLayer InputLayer;
 
         [XmlArrayItem(Type = typeof(HiddenLayer)),
@@ -21,13 +23,14 @@ namespace NeuralNetwork
         
         private Random m_Rand;
 
-        private const double MOMENTUM = 0.4;
+        private const double MOMENTUM = 0.5;
 
         //So serialization works
         public NeuralNetwork() { }
 
-        public NeuralNetwork(InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer, double learningRate)
+        public NeuralNetwork(string networkName, InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer, double learningRate)
         {
+            Name = networkName;
             InputLayer = inputLayer;
             HiddenLayers = hiddenLayers;
             OutputLayer = outputLayer;
@@ -52,6 +55,7 @@ namespace NeuralNetwork
                 {
                     ((ConvolutionalLayer)layer).InitFeatureMaps(prevLayer.NumFeatureMaps);
                 }
+                
                 prevLayer = layer;
             }
 
@@ -85,13 +89,13 @@ namespace NeuralNetwork
         /*
          * Trains the neural network using the given training example. ("Online" training)
          */
-        public void Train(double[] input, double[] expected)
+        public double Train(double[] input, double[] expected)
         {
             double[] actual = GetResult(input);
 
             //Output nodes
-            OutputLayer.Backpropagate(actual, expected, HiddenLayers.Last().Outputs, LearningRate, MOMENTUM);
-            
+            double error = OutputLayer.Backpropagate(actual, expected, HiddenLayers.Last().Outputs, LearningRate, MOMENTUM);
+
             Layer previous = OutputLayer;
 
             //Hidden nodes
@@ -104,21 +108,35 @@ namespace NeuralNetwork
 
                 previous = layer;
             }
+
+            return error;
         }
 
-        public void SaveToDisk(string path)
+        public void SaveToDisk(string directory)
         {
-            Serialization.SerializeObject<NeuralNetwork>(this, path);
+            Serialization.SerializeObject<NeuralNetwork>(this, Path.Combine(directory, Name + ".xml"));
         }
 
-        public void LoadFromDisk(string path)
+        public void LoadFromDisk(string directory)
         {
-            NeuralNetwork temp = Serialization.DeSerializeObject<NeuralNetwork>(path);
+            NeuralNetwork temp = Serialization.DeSerializeObject<NeuralNetwork>(Path.Combine(directory, Name + ".xml"));
 
             this.InputLayer = temp.InputLayer;
             this.HiddenLayers = temp.HiddenLayers;
             this.OutputLayer = temp.OutputLayer;
             this.LearningRate = temp.LearningRate;
+
+            foreach (HiddenLayer layer in HiddenLayers)
+            {
+                if (layer is ConvolutionalLayer)
+                {
+                    ConvolutionalLayer cLayer = layer as ConvolutionalLayer;
+                    foreach (FeatureMap fm in cLayer.FeatureMaps)
+                    {
+                        fm.Layer = cLayer;
+                    }
+                }
+            }
         }
 
         public void DisplayNetwork()

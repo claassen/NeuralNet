@@ -13,15 +13,17 @@ namespace NeuralNetwork
             //LogicalAnd();
             //LogicalOr();
             //LogicalXOr();
-            EvenOrOdd();   //nope
+            //EvenOrOdd();  
             //SinFunction();
+            //MNIST();
         }
 
-        static void SameOrDifferent()
+        /*static void SameOrDifferent()
         {
             ITrainingSetProvider trainingSetProvider = new SameOrDifferentTrainingSetProvider();
 
-            NetworkManager manager = new NetworkManager(trainingSetProvider,
+            NetworkManager manager = new NetworkManager(,
+                                                        trainingSetProvider,
                                                         new InputLayer(2),
                                                         new List<HiddenLayer>()
                                                         {
@@ -31,7 +33,7 @@ namespace NeuralNetwork
                                                         0.05);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(1000000, false);
+            manager.TrainNetwork(1000000);
 
             manager.ShowNetwork();
 
@@ -52,7 +54,7 @@ namespace NeuralNetwork
                                                         0.05);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(1000000, false);
+            manager.TrainNetwork(1000000);
 
             manager.ShowNetwork();
 
@@ -73,7 +75,7 @@ namespace NeuralNetwork
                                                         0.05);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(1000000, false);
+            manager.TrainNetwork(1000000);
 
             manager.ShowNetwork();
 
@@ -94,7 +96,7 @@ namespace NeuralNetwork
                                                         0.05);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(1000000, false);
+            manager.TrainNetwork(1000000);
 
             manager.ShowNetwork();
 
@@ -109,14 +111,14 @@ namespace NeuralNetwork
                                                         new InputLayer(7),
                                                         new List<HiddenLayer>()
                                                         {
-                                                            new ConvolutionalLayer(ActivationFunctionType.Sigmoid, 2, 3),
+                                                            //new ConvolutionalLayer(ActivationFunctionType.Sigmoid, 2, 3),
                                                             new HiddenLayer(ActivationFunctionType.Sigmoid, 50)
                                                         },
                                                         new OutputLayer(ActivationFunctionType.Sigmoid, 1),
                                                         0.25);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(10000, false); //+3
+            manager.TrainNetwork(10000000);
 
             manager.ShowNetwork();
 
@@ -137,12 +139,32 @@ namespace NeuralNetwork
                                                         0.25);
 
             Console.WriteLine("Training...");
-            manager.TrainNetwork(10000000, false);
+            manager.TrainNetwork(10000000);
 
             manager.ShowNetwork();
 
             manager.TestNetwork();
         }
-        
+
+        static void MNIST()
+        {
+            ITrainingSetProvider trainingSetProvider = new MNISTTrainingSetProvider();
+
+            NetworkManager manager = new NetworkManager(trainingSetProvider,
+                                                        new InputLayer(28*28),
+                                                        new List<HiddenLayer>()
+                                                        {
+                                                            new HiddenLayer(ActivationFunctionType.Tanh, 300)
+                                                        },
+                                                        new OutputLayer(ActivationFunctionType.Tanh, 10),
+                                                        0.25);
+
+            Console.WriteLine("Training...");
+            manager.TrainNetwork(100000);
+
+            //manager.ShowNetwork();
+
+            manager.TestNetwork();
+        }*/
     }
 }

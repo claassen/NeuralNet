@@ -8,7 +8,8 @@ namespace NeuralNetwork
     public enum ActivationFunctionType
     {
         Sigmoid = 1,
-        Tanh = 2
+        Tanh = 2,
+        Softmax = 3
     }
 
     public class ActivationFunction

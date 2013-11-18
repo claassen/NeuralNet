@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.IO;
 
 namespace NeuralNetwork
 {
@@ -167,10 +168,6 @@ namespace NeuralNetwork
         }
     }
 
-    /*
-     * Good settings: 
-     *  10000000 iterations, learning rate 0.25, 1000 training sets, 20 hidden nodes, sigmoid activation functions
-     */
     public class SinFunctionTrainingSetProvider : ITrainingSetProvider
     {
         public static List<TrainingExample> GetSinExamples(int count)
@@ -206,6 +203,84 @@ namespace NeuralNetwork
         public override int ResultSize()
         {
             return 1;
+        }
+    }
+
+    /*
+     * MNIST file format: http://yann.lecun.com/exdb/mnist/
+     */
+    public class MNISTTrainingSetProvider : ITrainingSetProvider
+    {
+        private const string MNIST_SOURCE_PATH = "C:\\MNIST";
+
+        private List<TrainingExample> GetMNISTExamples(string labelFile, string imageFile, int max = 0)
+        {
+            BinaryReader labelBr = new BinaryReader(new FileStream(labelFile, FileMode.Open));
+            BinaryReader imageBr = new BinaryReader(new FileStream(imageFile, FileMode.Open));
+
+            List<TrainingExample> examples = new List<TrainingExample>();
+
+            //Read header (32 bits)
+            labelBr.ReadInt32();
+
+            int numImages = Helpers.Int32FromBigEndianByteArray(labelBr.ReadBytes(4));
+
+            //Read header (32 bits)
+            imageBr.ReadInt32();
+
+            //Image file also contains number of images, just check to make sure its the same one we already read from the label file
+            if (numImages != Helpers.Int32FromBigEndianByteArray(imageBr.ReadBytes(4)))
+            {
+                labelBr.Close();
+                imageBr.Close();
+                throw new InvalidDataException("Number of images in label file does not match number of images in image file.");
+            }
+
+            //Image size
+            int numRows = Helpers.Int32FromBigEndianByteArray(imageBr.ReadBytes(4));
+            int numCols = Helpers.Int32FromBigEndianByteArray(imageBr.ReadBytes(4));
+
+            for (int i = 0; i < (max != 0 ? Math.Min(max, numImages) : numImages); i++)
+            {
+                double[] imageData = new double[numRows * numCols];
+                double[] expected = new double[10];
+
+                for (int p = 0; p < numRows * numCols; p++)
+                {
+                    imageData[p] = imageBr.ReadByte();
+                }
+
+                expected[labelBr.ReadByte()] = 1.0;
+
+                examples.Add(new TrainingExample(imageData, expected));
+            }
+
+            labelBr.Close();
+            imageBr.Close();
+
+            return examples;
+        }
+
+        public override List<TrainingExample> GetTrainingExamples()
+        {
+            return GetMNISTExamples(Path.Combine(MNIST_SOURCE_PATH, "train-labels.idx1-ubyte"), 
+                                    Path.Combine(MNIST_SOURCE_PATH, "train-images.idx3-ubyte"));
+        }
+
+        public override List<TrainingExample> GetTestingExamples()
+        {
+            return GetMNISTExamples(Path.Combine(MNIST_SOURCE_PATH, "t10k-labels.idx1-ubyte"),
+                                    Path.Combine(MNIST_SOURCE_PATH, "t10k-images.idx3-ubyte"));
+        }
+
+        public override int InputSize()
+        {
+            return 28 * 28;
+        }
+
+        public override int ResultSize()
+        {
+            return 10;
         }
     }
 }

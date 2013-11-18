@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NeuralNetwork", "NeuralNetwork\NeuralNetwork.csproj", "{DFACA8B8-4E84-4440-AEC4-C655B147D892}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkVisualizer", "NetworkVisualizer\NetworkVisualizer.csproj", "{E9CDCD15-9493-407A-B33E-74E52ADA81B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -13,6 +15,10 @@ Global
 		{DFACA8B8-4E84-4440-AEC4-C655B147D892}.Debug|x86.Build.0 = Debug|x86
 		{DFACA8B8-4E84-4440-AEC4-C655B147D892}.Release|x86.ActiveCfg = Release|x86
 		{DFACA8B8-4E84-4440-AEC4-C655B147D892}.Release|x86.Build.0 = Release|x86
+		{E9CDCD15-9493-407A-B33E-74E52ADA81B7}.Debug|x86.ActiveCfg = Debug|x86
+		{E9CDCD15-9493-407A-B33E-74E52ADA81B7}.Debug|x86.Build.0 = Debug|x86
+		{E9CDCD15-9493-407A-B33E-74E52ADA81B7}.Release|x86.ActiveCfg = Release|x86
+		{E9CDCD15-9493-407A-B33E-74E52ADA81B7}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
