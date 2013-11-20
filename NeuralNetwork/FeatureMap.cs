@@ -3,27 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
+using System.Threading.Tasks;
 
 namespace NeuralNetwork
 {
     [Serializable]
     public class FeatureMap
     {
-        public double[] KernelWeights;
-        public double Bias;
-
         [XmlIgnore, NonSerialized]
         public ConvolutionalLayer Layer;
 
+        public double[] KernelWeights;
+        public double Bias;
         public double BiasGradient;
-        
-        public double[] KernelWeightGradents;
-        
-        public double[] Output;
-
         public double PrevBiasGradient;
+        public double[] KernelWeightGradents;
         public double[] PrevKernelWeightGradients;
-
+        public double[] Output;
+       
         public FeatureMap() { }
 
         public FeatureMap(ConvolutionalLayer layer)
@@ -33,6 +30,14 @@ namespace NeuralNetwork
             KernelWeightGradents = new double[Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth];
             PrevKernelWeightGradients = new double[Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth];
             Output = new double[Layer.FeatureMapWidth * Layer.FeatureMapWidth];
+        }
+
+        private void ResetWeightGradients()
+        {
+            for (int i = 0; i < KernelWeightGradents.Length; i++)
+            {
+                KernelWeightGradents[i] = 0;
+            }
         }
 
         public void Convolute(double[] input, int index)
@@ -45,7 +50,7 @@ namespace NeuralNetwork
                 Output[i] = 0;
             }
 
-            for (int y = 0; y < Layer.FeatureMapWidth; y++)
+            Parallel.For(0, Layer.FeatureMapWidth, y =>
             {
                 for (int x = 0; x < Layer.FeatureMapWidth; x++)
                 {
@@ -62,67 +67,66 @@ namespace NeuralNetwork
                         }
                     }
                 }
-            }
+            });
         }
 
-        public void Backpropagate(double[] nextOutputs, int nextFeatureMapWidth, double[] fmOutputGradients, double learningRate, double momentum, int index)
+        public void Backpropagate(double[] nextOutputs, int nextFeatureMapWidth, double[] fmOutputGradients, double learningRate, double momentum, int index, double weightDecay, MiniBatchMode miniBatchMode)
         {
-            int nextOutputWidth = (int)Math.Sqrt(nextOutputs.Length);
-
-            for (int i = 0; i < Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth; i++)
+            if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.First)
             {
-                KernelWeightGradents[i] = 0;
+                ResetWeightGradients();
             }
 
-            for (int k = 0; k < Layer.NumPrevFeatureMaps; k++)
+            int nextOutputWidth = (int)Math.Sqrt(nextOutputs.Length);
+
+            Parallel.For(0, Layer.NumPrevFeatureMaps, k =>
             {
-                if (!Layer.FMIsConnectedToPrevFM(index, k))
+                if (Layer.FMIsConnectedToPrevFM(index, k))
                 {
-                    continue;
-                }
+                    //pixel 0 of the next layer feature map associated with the current kernel
+                    int nextNodeIndexFMBase = k * nextFeatureMapWidth * nextFeatureMapWidth;
 
-                //pixel 0 of the next layer feature map associated with the current kernel
-                int nextNodeIndexFMBase = k * nextFeatureMapWidth * nextFeatureMapWidth;
-
-                for (int y = 0; y < Layer.FeatureMapWidth; y++)
-                {
-                    for (int x = 0; x < Layer.FeatureMapWidth; x++)
+                    for (int y = 0; y < Layer.FeatureMapWidth; y++)
                     {
-                        //previously calculated error gradient of the current feature map pixel
-                        double dErrY = fmOutputGradients[x + y * Layer.FeatureMapWidth];
-
-                        //top left corner at the current kernel position in the next output
-                        int nextNodeIndexBase = nextNodeIndexFMBase + Layer.StepSize * x + Layer.StepSize * nextFeatureMapWidth * y;
-
-                        for (int ky = 0; ky < Layer.KernelWidth; ky++)
+                        for (int x = 0; x < Layer.FeatureMapWidth; x++)
                         {
-                            for (int kx = 0; kx < Layer.KernelWidth; kx++)
+                            //previously calculated error gradient of the current feature map pixel
+                            double dErrY = fmOutputGradients[x + y * Layer.FeatureMapWidth];
+
+                            //top left corner at the current kernel position in the next output
+                            int nextNodeIndexBase = nextNodeIndexFMBase + Layer.StepSize * x + Layer.StepSize * nextFeatureMapWidth * y;
+
+                            for (int ky = 0; ky < Layer.KernelWidth; ky++)
                             {
-                                KernelWeightGradents[k * Layer.KernelWidth * Layer.KernelWidth + kx + ky * Layer.KernelWidth] += dErrY * nextOutputs[nextNodeIndexBase + kx + ky * nextFeatureMapWidth];
+                                for (int kx = 0; kx < Layer.KernelWidth; kx++)
+                                {
+                                    KernelWeightGradents[k * Layer.KernelWidth * Layer.KernelWidth + kx + ky * Layer.KernelWidth] += dErrY * nextOutputs[nextNodeIndexBase + kx + ky * nextFeatureMapWidth];
+                                }
                             }
                         }
                     }
                 }
-            }
+            });
 
-            for (int i = 0; i < Layer.NumPrevFeatureMaps; i++)
+            if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
             {
-                if (!Layer.FMIsConnectedToPrevFM(index, i))
+                Parallel.For(0, Layer.NumPrevFeatureMaps, i =>
                 {
-                    continue;
-                }
+                    if (Layer.FMIsConnectedToPrevFM(index, i))
+                    {
+                        for (int j = 0; j < Layer.KernelWidth * Layer.KernelWidth; j++)
+                        {
+                            //Weight decay
+                            KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j] -= weightDecay * learningRate * KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j];
 
-                for (int j = 0; j < Layer.KernelWidth * Layer.KernelWidth; j++)
-                {
-                    //Weight decay
-                    KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j] -= 0.1 * learningRate * KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j];
+                            KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += learningRate * KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
 
-                    KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += learningRate * KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
-
-                    //Add momentum
-                    KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += momentum * PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j];
-                    PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j] = KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
-                }
+                            //Add momentum
+                            KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += momentum * PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j];
+                            PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j] = KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
+                        }
+                    }
+                });
             }
         }
 
@@ -140,7 +144,7 @@ namespace NeuralNetwork
         {
             int centerX = width / 2;
             int centerY = width / 2;
-            double spread = 0;
+            double spread = 0.5;
             double amplitude = -1;
 
             double[] data = new double[width * width];
@@ -149,9 +153,7 @@ namespace NeuralNetwork
             {
                 for (int x = 0; x < width; x++)
                 {
-                    //data[y * m_Layer.KernelWidth + x] = amplitude * Math.Exp(-((Math.Pow(x - centerX, 2) / (2 * Math.Pow(spread, 2)))
-                    //                                                         + (Math.Pow(y - centerY, 2) / (2 * Math.Pow(spread, 2)))));
-                    data[y * Layer.KernelWidth + x] = amplitude * Math.Exp(-(0.5 * (Math.Pow(x - centerX, 2)) + 0.5 * (Math.Pow(y - centerY, 2))));
+                    data[y * Layer.KernelWidth + x] = amplitude * Math.Exp(-(spread * (Math.Pow(x - centerX, 2)) + spread * (Math.Pow(y - centerY, 2))));
                 }
             }
 

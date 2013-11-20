@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
+using System.Threading.Tasks;
 
 namespace NeuralNetwork
 {
@@ -15,13 +16,9 @@ namespace NeuralNetwork
         public double[] Weights { get; set; }
         public int NumFeatureMaps { get; set; }
 
-        //[XmlIgnore, NonSerialized]
         public double[] Outputs;
-        //[XmlIgnore, NonSerialized]
         public double[] OutputGradients;
-        //[XmlIgnore, NonSerialized]
         public double[] WeightGradients;
-        //[XmlIgnore, NonSerialized]
         public double[] PrevWeightGradients;
         
         public Layer() { }
@@ -32,6 +29,14 @@ namespace NeuralNetwork
             NumNodes = numNodes;
             Outputs = new double[NumNodes];
             OutputGradients = new double[NumNodes];
+        }
+
+        protected void ResetWeightGradients()
+        {
+            for (int i = 0; i < NumNodes * NumWeightsPerNode; i++)
+            {
+                WeightGradients[i] = 0;
+            }
         }
 
         public virtual void Init(int numPreviousLayer)
@@ -53,20 +58,9 @@ namespace NeuralNetwork
                 double sum = 0;
                 for (int j = 0; j < NumWeightsPerNode; j++)
                 {
-                    if (Double.IsNaN(Weights[i * NumWeightsPerNode + j]))
-                    {
-                        Console.WriteLine("asd");
-                    }
-
                     sum += Weights[i * NumWeightsPerNode + j] * (j == 0 ? 1 : input[j - 1]);
                 }
                 Outputs[i] = ActivationFunctions.Get(ActivationFuncType).Function(sum);
-
-                if (Double.IsNaN(Outputs[i]))
-                {
-                    Console.WriteLine("asd");
-                }
-
             }
 
             return Outputs;
@@ -85,7 +79,7 @@ namespace NeuralNetwork
             }
         }
 
-        public virtual double Backpropagate(Layer previous, Layer next, double learningRate, double momentum)
+        public virtual double Backpropagate(Layer previous, Layer next, double learningRate, double momentum, double weightDecay, MiniBatchMode miniBatchMode)
         {
             throw new NotImplementedException();
         }
@@ -142,9 +136,14 @@ namespace NeuralNetwork
             }
         }
 
-        public double Backpropagate(double[] actual, double[] expected, double[] nextOutputs, double learningRate, double momentum)
+        public double Backpropagate(double[] actual, double[] expected, double[] nextOutputs, double learningRate, double momentum, double weightDecay, MiniBatchMode miniBatchMode)
         {
             double error = 0;
+
+            if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.First)
+            {
+                ResetWeightGradients();
+            }
 
             if (ActivationFuncType == ActivationFunctionType.Softmax)
             {
@@ -152,22 +151,21 @@ namespace NeuralNetwork
                 {
                     OutputGradients[i] = (expected[i] - actual[i]) * NumNodes;
 
-                    if (Double.IsNaN(OutputGradients[i]))
-                    {
-                        Console.WriteLine("asd");
-                    }
-
                     error += Math.Abs(expected[i] - actual[i]);
 
                     for (int j = 0; j < NumWeightsPerNode; j++)
                     {
-                        WeightGradients[i * NumWeightsPerNode + j] = learningRate * OutputGradients[i] * (j == 0 ? 1 : nextOutputs[j - 1]);
+                        WeightGradients[i * NumWeightsPerNode + j] += learningRate * OutputGradients[i] * (j == 0 ? 1 : nextOutputs[j - 1]);
 
-                        //Weight decay
-                        WeightGradients[i * NumWeightsPerNode + j] -= 0.1 * learningRate * Weights[i * NumWeightsPerNode + j];
+                        if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
+                        {
+                            //Weight decay
+                            WeightGradients[i * NumWeightsPerNode + j] -= weightDecay * learningRate * Weights[i * NumWeightsPerNode + j];
 
-                        Weights[i * NumWeightsPerNode + j] += WeightGradients[i * NumWeightsPerNode + j];
-                        Weights[i * NumWeightsPerNode + j] += momentum * PrevWeightGradients[i * NumWeightsPerNode + j];
+                            Weights[i * NumWeightsPerNode + j] += WeightGradients[i * NumWeightsPerNode + j];
+                            Weights[i * NumWeightsPerNode + j] += momentum * PrevWeightGradients[i * NumWeightsPerNode + j];
+                        }
+
                         PrevWeightGradients[i * NumWeightsPerNode + j] = WeightGradients[i * NumWeightsPerNode + j];
                     }
                 }
@@ -182,13 +180,17 @@ namespace NeuralNetwork
 
                     for (int j = 0; j < NumWeightsPerNode; j++)
                     {
-                        WeightGradients[i * NumWeightsPerNode + j] = learningRate * OutputGradients[i] * (j == 0 ? 1 : nextOutputs[j - 1]);
+                        WeightGradients[i * NumWeightsPerNode + j] += learningRate * OutputGradients[i] * (j == 0 ? 1 : nextOutputs[j - 1]);
 
-                        //Weight decay
-                        WeightGradients[i * NumWeightsPerNode + j] -= 0.1 * learningRate * Weights[i * NumWeightsPerNode + j];
+                        if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
+                        {
+                            //Weight decay
+                            WeightGradients[i * NumWeightsPerNode + j] -= weightDecay * learningRate * Weights[i * NumWeightsPerNode + j];
 
-                        Weights[i * NumWeightsPerNode + j] += WeightGradients[i * NumWeightsPerNode + j];
-                        Weights[i * NumWeightsPerNode + j] += momentum * PrevWeightGradients[i * NumWeightsPerNode + j];
+                            Weights[i * NumWeightsPerNode + j] += WeightGradients[i * NumWeightsPerNode + j];
+                            Weights[i * NumWeightsPerNode + j] += momentum * PrevWeightGradients[i * NumWeightsPerNode + j];
+                        }
+
                         PrevWeightGradients[i * NumWeightsPerNode + j] = WeightGradients[i * NumWeightsPerNode + j];
                     }
                 }
@@ -207,8 +209,13 @@ namespace NeuralNetwork
         {
         }
 
-        public override double Backpropagate(Layer previous, Layer next, double learningRate, double momentum)
+        public override double Backpropagate(Layer previous, Layer next, double learningRate, double momentum, double weightDecay, MiniBatchMode miniBatchMode)
         {
+            if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.First)
+            {
+                ResetWeightGradients();
+            }
+
             for (int j = 0; j < NumNodes; j++)
             {
                 double outputGradientSum = 0;
@@ -219,24 +226,23 @@ namespace NeuralNetwork
 
                 OutputGradients[j] = ActivationFunctions.Get(ActivationFuncType).Derivative(Outputs[j]) * outputGradientSum;
 
-                if (Double.IsNaN(OutputGradients[j]))
-                {
-                    Console.WriteLine("asd");
-                }
-
                 int weightIndexBase = j * NumWeightsPerNode;
                 double lrTimesGradient = learningRate * OutputGradients[j];
 
                 for (int k = 0; k < NumWeightsPerNode; k++)
                 {
                     int weightIndex = weightIndexBase + k;
-                    WeightGradients[weightIndex] = lrTimesGradient * (k == 0 ? 1 : next.Outputs[k - 1]);
+                    WeightGradients[weightIndex] += lrTimesGradient * (k == 0 ? 1 : next.Outputs[k - 1]);
 
-                    //Weight decay
-                    WeightGradients[weightIndex] -= 0.1 * lrTimesGradient * Weights[weightIndex];
+                    if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
+                    {
+                        //Weight decay
+                        WeightGradients[weightIndex] -= weightDecay * lrTimesGradient * Weights[weightIndex];
 
-                    Weights[weightIndex] += WeightGradients[weightIndex];
-                    Weights[weightIndex] += momentum * PrevWeightGradients[weightIndex];
+                        Weights[weightIndex] += WeightGradients[weightIndex];
+                        Weights[weightIndex] += momentum * PrevWeightGradients[weightIndex];
+                    }
+
                     PrevWeightGradients[weightIndex] = WeightGradients[weightIndex];
                 }
             }
@@ -319,33 +325,31 @@ namespace NeuralNetwork
                 }
             }
 
-            //Convolute the feature maps
-            for (int i = 0; i < NumFeatureMaps; i++)
+            Parallel.For(0, NumFeatureMaps, index =>
             {
                 for (int j = 0; j < NumPrevFeatureMaps; j++)
                 {
-                    if (FMIsConnectedToPrevFM(i, j))
+                    if (FMIsConnectedToPrevFM(index, j))
                     {
-                        FeatureMaps[i].Convolute(inputAsFeatureMaps[j], j);
+                        FeatureMaps[index].Convolute(inputAsFeatureMaps[j], j);
                     }
                 }
-            }
+            });
 
-            //Extract the output from the feature maps (as we provide a standard interface of returning output as a double[]) and add bias
-            for (int i = 0; i < NumFeatureMaps; i++)
+            Parallel.For(0, NumFeatureMaps, index =>
             {
-                double[] fmOutput = FeatureMaps[i].Output;
+                double[] fmOutput = FeatureMaps[index].Output;
 
                 for (int j = 0; j < FeatureMapWidth * FeatureMapWidth; j++)
                 {
-                    Outputs[j + i * FeatureMapWidth * FeatureMapWidth] = ActivationFunctions.Get(ActivationFuncType).Function(fmOutput[j] + FeatureMaps[i].Bias);
+                    Outputs[j + index * FeatureMapWidth * FeatureMapWidth] = ActivationFunctions.Get(ActivationFuncType).Function(fmOutput[j] + FeatureMaps[index].Bias);
                 }
-            }
+            });
 
             return Outputs;
         }
 
-        public override double Backpropagate(Layer previous, Layer next, double learningRate, double momentum)
+        public override double Backpropagate(Layer previous, Layer next, double learningRate, double momentum, double weightDecay, MiniBatchMode miniBatchMode)
         {
             if (previous is ConvolutionalLayer)
             {
@@ -357,13 +361,13 @@ namespace NeuralNetwork
                 }
 
                 //Calculate output gradient sums
-                for (int fm = 0; fm < NumFeatureMaps; fm++)
+                Parallel.For(0, NumFeatureMaps, fm =>
                 {
                     //pixel 0 for the current feature map in this layers output
                     int nodeIndexFMBase = fm * FeatureMapWidth * FeatureMapWidth;
 
                     //weight 0 of the kernel weights for the current FM in this layer in the current FM in previous layer
-                    int prevKernelWeightIndexBase = fm * prevCLayer.KernelWidth * prevCLayer.KernelWidth; 
+                    int prevKernelWeightIndexBase = fm * prevCLayer.KernelWidth * prevCLayer.KernelWidth;
 
                     for (int prevFm = 0; prevFm < prevCLayer.NumFeatureMaps; prevFm++)
                     {
@@ -401,7 +405,7 @@ namespace NeuralNetwork
                             }
                         }
                     }
-                }
+                });
             }
             else
             {
@@ -454,10 +458,12 @@ namespace NeuralNetwork
             }
 
             int nextFeatureMapWidth = (int)Math.Sqrt(next.Outputs.Length / next.NumFeatureMaps);
-            for (int i = 0; i < NumFeatureMaps; i++)
+            //for (int i = 0; i < NumFeatureMaps; i++)
+            //{
+            Parallel.For(0, NumFeatureMaps, i =>
             {
-                FeatureMaps[i].Backpropagate(next.Outputs, nextFeatureMapWidth, outputGradientsAsFeatureMapOutputGradients[i], learningRate, momentum, i);
-            }
+                FeatureMaps[i].Backpropagate(next.Outputs, nextFeatureMapWidth, outputGradientsAsFeatureMapOutputGradients[i], learningRate, momentum, i, weightDecay, miniBatchMode);
+            });
 
             return 0;
         }

@@ -9,6 +9,7 @@ namespace NeuralNetwork
     {
         private ITrainingSetProvider m_TrainingSetProvider;
         private List<TrainingExample> m_TrainingExamples;
+        private List<TrainingExample> m_TestingExamples;
         private NeuralNetwork m_Network;
         private Random m_Rand;
 
@@ -16,6 +17,7 @@ namespace NeuralNetwork
         {
             m_TrainingSetProvider = trainingSetProvider;
             m_TrainingExamples = trainingSetProvider.GetTrainingExamples();
+            m_TestingExamples = trainingSetProvider.GetTestingExamples();
 
             m_Network = new NeuralNetwork(networkName, inputLayer, hiddenLayers, outputLayer, learningRate);
 
@@ -32,22 +34,34 @@ namespace NeuralNetwork
             return m_TrainingExamples[m_Rand.Next(m_TrainingExamples.Count)];
         }
 
-        public void TrainNetwork(long iterations, bool loadPrevious, Func<NeuralNetwork, double, bool> onTrain = null)
+        public TrainingExample GetRandomTestingExample()
         {
-            bool useAdaptiveLearningRate = true;
+            return m_TestingExamples[m_Rand.Next(m_TestingExamples.Count)];
+        }
 
+        public void TrainNetwork(long iterations, bool loadPrevious, bool useAdaptiveLearningRate, bool useMiniBatch, Func<NeuralNetwork, double, bool> onTrain = null)
+        {
             if (loadPrevious)
             {
                 m_Network.LoadFromDisk("C:\\nets");
             }
 
+            int miniBatchSize = 100;
+
             if (!useAdaptiveLearningRate)
             {
                 for (long i = 0; i < iterations; i++)
                 {
-                    TrainingExample example = GetRandomTrainingExample();
+                    double error;
 
-                    double error = m_Network.Train(example.Input, example.Expected);
+                    if (useMiniBatch)
+                    {
+                        error = TrainMiniBatch(miniBatchSize);
+                    }
+                    else
+                    {
+                        error = m_Network.Train(GetRandomTrainingExample());
+                    }
 
                     if (null != onTrain)
                     {
@@ -63,9 +77,10 @@ namespace NeuralNetwork
 
             //Adaptive learning rate method.
             //This method was taken from this paper: http://lmb.informatik.uni-freiburg.de/papers/download/du_diss.pdf
+            int numTrainingExamples = 20;
             double dE = 0;
             double dEAvg = 0;
-            double prevError = TestNetwork(null, 100);
+            double prevError = TestNetwork(null, numTrainingExamples) / numTrainingExamples;
             double minError = prevError;
             int minErrorIter = 0;
 
@@ -74,16 +89,23 @@ namespace NeuralNetwork
             int maxItersBeforeRevertingToLastBest = 5000;
             double minErrorChange = 0.01;
             double alpha = 0.1;
-            int numTrainingExamples = 10;
-
+            
             m_Network.LearningRate = 0.0000000001;
 
             for (int i = 0; i < iterations; i++)
             {
-                TrainingExample example = GetRandomTrainingExample();
-                double tError = m_Network.Train(example.Input, example.Expected);
+                double tError = 0;
 
-                double error = TestNetwork(null, numTrainingExamples) / numTrainingExamples;//m_Network.Train(example.Input, example.Expected);
+                if (useMiniBatch)
+                {
+                    tError = TrainMiniBatch(miniBatchSize);
+                }
+                else
+                {
+                    tError = m_Network.Train(GetRandomTrainingExample());
+                }
+                
+                double error = TestNetwork(null, numTrainingExamples) / numTrainingExamples;
 
                 dE = (error - prevError) / error;
                 prevError = error;
@@ -133,7 +155,19 @@ namespace NeuralNetwork
                 }
             }
 
-            m_Network.LoadFromDisk("C:\\nets\\bestsofar.xml");
+            m_Network.LoadFromDisk("C:\\nets");
+        }
+
+        private double TrainMiniBatch(int batchSize)
+        {
+            m_Network.Train(GetRandomTrainingExample(), MiniBatchMode.First);
+
+            for (int i = 1; i < batchSize; i++)
+            {
+                m_Network.Train(GetRandomTrainingExample(), MiniBatchMode.Accumulate);
+            }
+
+            return m_Network.Train(GetRandomTrainingExample(), MiniBatchMode.Compute);
         }
 
         public void ShowNetwork()
@@ -141,26 +175,18 @@ namespace NeuralNetwork
             m_Network.DisplayNetwork();
         }
 
-        /// <summary>
-        /// Tests the network using the current provider and returns the total error.
-        /// </summary>
-        /// <param name="onTest">Callback function to be called on each test.
-        ///                      Parameters: input, actual, expected</param>
-        /// <returns>Total error over all testing examples.</returns>
         public double TestNetwork(Func<double[], double[], double[], bool> onTest = null, int maxIterations = 0)
         {
-            List<TrainingExample> examples = m_TrainingSetProvider.GetTestingExamples();
-            
             double error = 0;
             
-            for (int i = 0; i < examples.Count; i++)
+            for (int i = 0; i < m_TestingExamples.Count; i++)
             {
                 if (maxIterations > 0 && i >= maxIterations)
                 {
                     break;
                 }
 
-                TrainingExample example = examples[i];
+                TrainingExample example = m_TestingExamples[i];
 
                 double[] result = m_Network.GetResult(example.Input);
 

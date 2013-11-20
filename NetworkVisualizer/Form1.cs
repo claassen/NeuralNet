@@ -9,11 +9,10 @@ using System.Windows.Forms;
 using NeuralNetwork;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Drawing.Imaging;
 
 namespace NetworkVisualizer
 {
-    public partial class Form1 : Form
+    public partial class MainWindow : Form
     {
         private NetworkManager m_Manager;
         private BackgroundWorker m_Worker;
@@ -22,66 +21,78 @@ namespace NetworkVisualizer
         private PictureBox[][] featureMapImages;
 
         private ITrainingSetProvider provider;
+        private List<TrainingExample> testingExamples;
         private TrainingExample testExample;
 
         private int textExampleIndex = 0;
 
         private ManualResetEvent evt = new ManualResetEvent(false);
-
-        public Form1()
+       
+        public MainWindow()
         {
             InitializeComponent();
             label2.Visible = false;
             progressBar1.Visible = false;
+
+            Init();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void Init()
         {
-            button1.Enabled = false;
+            StopButton.Enabled = false;
 
             ITrainingSetProvider trainingSetProvider = new MNISTTrainingSetProvider();
             provider = trainingSetProvider;
-            testExample = trainingSetProvider.GetTestingExamples()[textExampleIndex];
-            pictureBox1.Image = ImageFromDoubleArray(testExample.Input, 48, 48);
-            pictureBox1.BeginInvoke(new Action(() =>
-            {
-                pictureBox1.Image = ImageFromDoubleArray(testExample.Input, 28, 28);
-            }));
 
-            //new ConvolutionalLayer(ActivationFunctionType.Tanh, 4, 20, 2),
-            //                                   new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2),
-            //                                   new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 1),
-            //120000 iters, Tanh, 1 layer of 300, 0.005 = ~13% error
-            //120000 iters, Sigmoid, 1 layer of 300, 0.005 = ~13% error
-            m_Manager = new NetworkManager("bestsofar",
+            testingExamples = trainingSetProvider.GetTestingExamples();
+
+            testExample = testingExamples[textExampleIndex];
+
+            m_Manager = new NetworkManager("testnet4",
                                            trainingSetProvider,
                                            new InputLayer(28 * 28),
                                            new List<HiddenLayer>()
                                            {
-                                               new ConvolutionalLayer(ActivationFunctionType.Tanh, 2, 20, 2),
-                                               new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2),
-                                               new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 1),
-                                               new HiddenLayer(ActivationFunctionType.Tanh, 800),
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 20, 1), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 4, 60, 2), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 2),
+                                               //new HiddenLayer(ActivationFunctionType.Tanh, 300)
+
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 2, 10, 2), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 1),
+                                               new HiddenLayer(ActivationFunctionType.Tanh, 800)
                                            },
                                            new OutputLayer(ActivationFunctionType.Softmax, 10),
-                                           0.00025); //0.005
+                                           0.0005);
 
-            try
-            {
-                SetupDisplay(m_Manager.GetNetwork(), trainingSetProvider);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
+
+            SetupDisplay();
+        }
+
+        private void TrainButton_Click(object sender, EventArgs e)
+        {
+            StopButton.Enabled = true;
+            TrainButton.Enabled = false;
+            TestButton.Enabled = false;
 
             label2.Visible = true;
             progressBar1.Visible = true;
-            
-            TrainNetwork(0.001);
+
+            TrainNetwork(0.01, false, chkDynamicLearningRate.Checked, chkUseMiniBatch.Checked);
         }
 
-        private void TrainNetwork(double errorThreshold)
+        private void TestButton_Click(object sender, EventArgs e)
+        {
+            TestNetwork();
+        }
+
+        private void StopButton_Click(object sender, EventArgs e)
+        {
+            m_Worker.CancelAsync();
+        }
+
+        private void TrainNetwork(double errorThreshold, bool loadPrev, bool useAdaptiveLearningRate, bool useMiniBatch)
         {
             m_Worker = new BackgroundWorker();
             m_Worker.WorkerSupportsCancellation = true;
@@ -94,9 +105,8 @@ namespace NetworkVisualizer
 
             m_Worker.DoWork += new DoWorkEventHandler((o, args) =>
             {
-                m_Manager.TrainNetwork(trainingIters, false, (network, error) =>
+                m_Manager.TrainNetwork(trainingIters, loadPrev, useAdaptiveLearningRate, useMiniBatch, (network, error) =>
                 {
-                    
                     if (m_Worker.CancellationPending)
                     {
                         m_Worker.Dispose();
@@ -107,28 +117,21 @@ namespace NetworkVisualizer
                     avgError += error;
                     avgError /= 25;
 
-                    if (double.IsNaN(avgError) || double.IsNaN(error))
-                    {
-                        MessageBox.Show("NAN. error: "+error);
-                    }
-
                     epoch++;
 
-                    if (epoch % 50 == 0 || avgError <= errorThreshold)
+                    if (epoch % 10 == 0 || avgError <= errorThreshold)
                     {
                         lblAvgError.BeginInvoke(new Action(() =>
                         {
                             lblAvgError.Text = "" + avgError;
                         }));
 
-                        UpdateDisplay(network, testExample.Input);
+                        UpdateDisplay(testExample.Input, "");
                     }
 
                     if (epoch % 10 == 0)
                     {
-                        double temp = ((double)epoch / (double)trainingIters) * 100;
-
-                        m_Worker.ReportProgress((int)temp);
+                        m_Worker.ReportProgress((int)(((double)epoch / (double)trainingIters) * 100));
                     }
 
                     if (avgError <= errorThreshold) return false;
@@ -146,7 +149,9 @@ namespace NetworkVisualizer
             {
                 label2.Visible = false;
                 progressBar1.Visible = false;
-                TestNetwork();
+                StopButton.Enabled = false;
+                TrainButton.Enabled = true;
+                TestButton.Enabled = true;
             });
 
             m_Worker.RunWorkerAsync();
@@ -154,6 +159,10 @@ namespace NetworkVisualizer
 
         private void TestNetwork()
         {
+            StopButton.Enabled = true;
+            TrainButton.Enabled = false;
+            TestButton.Enabled = false;
+
             int totalTests = 0;
             int totalCorrect = 0;
 
@@ -163,6 +172,8 @@ namespace NetworkVisualizer
 
             int numIters = provider.GetTestingExamples().Count();
             int epoch = 0;
+
+            DateTime last = DateTime.Now;
 
             m_Worker.DoWork += new DoWorkEventHandler((o, args) =>
             {
@@ -176,23 +187,17 @@ namespace NetworkVisualizer
                             return false;
                         }
 
-                        int num = Helpers.GetMaxValueIndex(result);
+                        int guess = Helpers.GetMaxValueIndex(result);
                        
                         int expectedNum = Helpers.GetMaxValueIndex(expected);
                         
                         totalTests++;
 
-                        if (expectedNum == num)
+                        if (expectedNum == guess)
                         {
                             totalCorrect++;
-                            //System.Threading.Thread.Sleep(20);
                         }
-                        else
-                        {
-                            //Slow down to show incorrect result
-                            //System.Threading.Thread.Sleep(500);
-                        }
-
+                        
                         epoch++;
 
                         if (epoch % 10 == 0)
@@ -201,26 +206,13 @@ namespace NetworkVisualizer
                             m_Worker.ReportProgress((int)temp);
                         }
 
-                        if (epoch % 100 == 0)
+                        DateTime now = DateTime.Now;
+
+                        if (now.Subtract(last).Seconds > 1)
                         {
-                            label1.BeginInvoke(new Action(() =>
-                            {
-                                label1.Text = "" + num;
-                            }));
-
-                            pictureBox1.BeginInvoke(new Action(() =>
-                            {
-                                if (pictureBox1.Image != null)
-                                {
-                                    pictureBox1.Image.Dispose();
-                                }
-                                pictureBox1.Image = ImageFromDoubleArray(input, 28, 28);
-                            }));
-
-                            UpdateDisplay(m_Manager.GetNetwork(), input);
+                            last = now;
+                            UpdateDisplay(input, guess.ToString());
                         }
-
-                        //System.Threading.Thread.Sleep(500);
 
                         return true;
                     });
@@ -238,7 +230,10 @@ namespace NetworkVisualizer
 
             m_Worker.RunWorkerCompleted += new RunWorkerCompletedEventHandler((o, args) =>
             {
-                button1.Enabled = true;
+                StopButton.Enabled = false;
+                TrainButton.Enabled = true;
+                TestButton.Enabled = true;
+
                 MessageBox.Show(totalCorrect + " out of " + totalTests + " correct");
             });
 
@@ -250,9 +245,9 @@ namespace NetworkVisualizer
             m_Worker.RunWorkerAsync();
         }
 
-        private void SetupDisplay(NeuralNetwork.NeuralNetwork network, ITrainingSetProvider provider)
+        private void SetupDisplay()
         {
-            List<ConvolutionalLayer> convLayers = network.HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
+            List<ConvolutionalLayer> convLayers = m_Manager.GetNetwork().HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
 
             layerPanels = new FlowLayoutPanel[convLayers.Count];
             featureMapImages = new PictureBox[convLayers.Count][];
@@ -264,8 +259,8 @@ namespace NetworkVisualizer
                 layerPanels[i] = new FlowLayoutPanel();
                 layerPanels[i].FlowDirection = FlowDirection.TopDown;
                 layerPanels[i].BorderStyle = BorderStyle.Fixed3D;
-                layerPanels[i].Width = 150;
-                layerPanels[i].Height = 300;
+                layerPanels[i].Width = (flowLayoutPanel.Width / layerPanels.Length) - 20;
+                layerPanels[i].Height = flowLayoutPanel.Height - 20;
                 layerPanels[i].AutoScroll = true;
 
                 for (int j = 0; j < convLayers[i].NumFeatureMaps; j++)
@@ -279,109 +274,64 @@ namespace NetworkVisualizer
 
                 flowLayoutPanel.Controls.Add(layerPanels[i]);
             }
+
+            pictureBox1.Image = Helpers.ImageFromDoubleArray(testExample.Input, 48, 48);
+            UpdateDisplay(testExample.Input, "");
         }
 
-        private void UpdateDisplay(NeuralNetwork.NeuralNetwork network, double[] input)
+        private void UpdateDisplay(double[] input, string guess)
         {
-            List<ConvolutionalLayer> convLayers = network.HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
-
-            network.GetResult(input);
-
-            evt.Reset();
-            this.BeginInvoke(new Action(() =>
+            lock (this)
             {
-                for (int i = 0; i < layerPanels.Length; i++)
+                List<ConvolutionalLayer> convLayers = m_Manager.GetNetwork().HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
+
+                m_Manager.GetNetwork().GetResult(input);
+
+                evt.Reset();
+
+                Action uiThreadWork = new Action(() =>
                 {
-                    for (int j = 0; j < featureMapImages[i].Length; j++)
+                    pictureBox1.Image = Helpers.ImageFromDoubleArray(input, 28, 28);
+                    label1.Text = guess;
+
+                    for (int i = 0; i < layerPanels.Length; i++)
                     {
-                        if (featureMapImages[i][j].Image != null)
+                        for (int j = 0; j < featureMapImages[i].Length; j++)
                         {
-                            featureMapImages[i][j].Image.Dispose();
+                            if (featureMapImages[i][j].Image != null)
+                            {
+                                featureMapImages[i][j].Image.Dispose();
+                            }
+                            featureMapImages[i][j].Image = Helpers.ImageFromDoubleArray(convLayers[i].FeatureMaps[j].Output, 44, 44);
                         }
-                        featureMapImages[i][j].Image = ImageFromDoubleArray(convLayers[i].FeatureMaps[j].Output, 44, 44);
                     }
-                }
 
-                evt.Set();
-            }));
-            evt.WaitOne();
-        }
+                    evt.Set();
+                });
 
-        private Image ImageFromDoubleArray(double[] data, int desiredWidth, int desiredHeight)
-        {
-            int origWidth = (int)Math.Sqrt(data.Length);
-
-            byte[] byteData = new byte[data.Length];
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                byteData[i] = (byte)data[i];
-            }
-
-            Bitmap bmp = new Bitmap(origWidth, origWidth);
-
-            for (int i = 0; i < origWidth; i++)
-            {
-                for (int j = 0; j < origWidth; j++)
+                if (this.InvokeRequired)
                 {
-                    byte b = byteData[i * origWidth + j];
-                    Color c = Color.FromArgb(255, b, b, b);
-                    
-                    bmp.SetPixel(j, i, c);
+                    this.BeginInvoke(uiThreadWork);
                 }
+                else
+                {
+                    uiThreadWork();
+                }
+
+                evt.WaitOne();
             }
-            
-
-            //PixelFormat pixelFormat = PixelFormat.Format8bppIndexed;
-            //int stride = origWidth;
-
-            //Bitmap bmp = new Bitmap(origWidth, origWidth, pixelFormat);
-            //System.Drawing.Imaging.BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, origWidth, origWidth), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
-
-            //IntPtr ptr = bmpData.Scan0;
-
-            //Marshal.Copy(byteData, 0, ptr, origWidth * origWidth);
-
-            //bmp.UnlockBits(bmpData);
-
-            //Bitmap resized = new Bitmap(bmp, new Size(width, height));
-
-            //return bmp;
-            return ResizeBitmap(bmp, origWidth * 3, origWidth * 3);
-        }
-
-        private Bitmap ResizeBitmap(Bitmap sourceBMP, int width, int height)
-        {
-            Bitmap result = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format16bppRgb555);
-            using (Graphics g = Graphics.FromImage(result))
-            {
-                g.DrawImage(sourceBMP, 0, 0, width, height);
-            }
-            sourceBMP.Dispose();
-            return result;
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            m_Worker.CancelAsync();
         }
 
         private void prevButton_Click(object sender, EventArgs e)
         {
-            testExample = provider.GetTestingExamples()[textExampleIndex--];
-            pictureBox1.BeginInvoke(new Action(() =>
-            {
-                pictureBox1.Image = ImageFromDoubleArray(testExample.Input, 28, 28);
-            }));
+            testExample = testingExamples[textExampleIndex--];
+            UpdateDisplay(testExample.Input, "");
         }
 
         private void nextButton_Click(object sender, EventArgs e)
         {
-            testExample = provider.GetTestingExamples()[textExampleIndex++];
-            pictureBox1.BeginInvoke(new Action(() =>
-            {
-                pictureBox1.Image = ImageFromDoubleArray(testExample.Input, 28, 28);
-            }));
+            testExample = testingExamples[textExampleIndex++];
+            UpdateDisplay(testExample.Input, "");
         }
     }
 }

@@ -7,6 +7,14 @@ using System.IO;
 
 namespace NeuralNetwork
 {
+    public enum MiniBatchMode
+    {
+        Off = 0,
+        First = 1,
+        Accumulate = 2,
+        Compute = 3
+    }
+
     [Serializable]
     public class NeuralNetwork
     {
@@ -24,6 +32,7 @@ namespace NeuralNetwork
         private Random m_Rand;
 
         private const double MOMENTUM = 0.5;
+        private const double WEIGHT_DECAY = 0.0;
 
         //So serialization works
         public NeuralNetwork() { }
@@ -89,12 +98,12 @@ namespace NeuralNetwork
         /*
          * Trains the neural network using the given training example. ("Online" training)
          */
-        public double Train(double[] input, double[] expected)
+        public double Train(TrainingExample example, MiniBatchMode miniBatchMode = MiniBatchMode.Off)
         {
-            double[] actual = GetResult(input);
+            double[] actual = GetResult(example.Input);
 
             //Output nodes
-            double error = OutputLayer.Backpropagate(actual, expected, HiddenLayers.Last().Outputs, LearningRate, MOMENTUM);
+            double error = OutputLayer.Backpropagate(actual, example.Expected, HiddenLayers.Last().Outputs, LearningRate, MOMENTUM, WEIGHT_DECAY, miniBatchMode);
 
             Layer previous = OutputLayer;
 
@@ -104,7 +113,7 @@ namespace NeuralNetwork
                 Layer layer = HiddenLayers[i];
                 Layer next = (i == 0 ? (Layer)InputLayer : (Layer)HiddenLayers[i - 1]);
 
-                layer.Backpropagate(previous, next, LearningRate, MOMENTUM);
+                layer.Backpropagate(previous, next, LearningRate, MOMENTUM, WEIGHT_DECAY, miniBatchMode);
 
                 previous = layer;
             }
