@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
 using System.Threading.Tasks;
+using NeuralNetwork.Layers;
+using NeuralNetwork.Functions;
 
 namespace NeuralNetwork
 {
@@ -20,11 +22,14 @@ namespace NeuralNetwork
         public double[] KernelWeightGradents;
         public double[] PrevKernelWeightGradients;
         public double[] Output;
+
+        private int Index;
        
         public FeatureMap() { }
 
-        public FeatureMap(ConvolutionalLayer layer)
+        public FeatureMap(ConvolutionalLayer layer, int index)
         {
+            Index = index;
             Layer = layer;
             KernelWeights = new double[Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth];
             KernelWeightGradents = new double[Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth];
@@ -36,7 +41,8 @@ namespace NeuralNetwork
         {
             for (int i = 0; i < KernelWeightGradents.Length; i++)
             {
-                KernelWeightGradents[i] = 0;
+                Layer.WeightGradients[Index * Layer.NumWeightsPerFeatureMap + i] = 0;
+                //KernelWeightGradents[i] = 0;
             }
         }
 
@@ -68,9 +74,14 @@ namespace NeuralNetwork
                     }
                 }
             });
+
+            for (int i = 0; i < Output.Length; i++)
+            {
+                Output[i] = ActivationFunctions.Get(Layer.ActivationFuncType).Function(Output[i] + Bias);
+            }
         }
 
-        public void Backpropagate(double[] nextOutputs, int nextFeatureMapWidth, double[] fmOutputGradients, double learningRate, double momentum, int index, double weightDecay, MiniBatchMode miniBatchMode)
+        public void Backpropagate(double[] nextOutputs, int nextFeatureMapWidth, double[] fmOutputGradients, double learningRate, double momentum, double weightDecay, MiniBatchMode miniBatchMode)
         {
             if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.First)
             {
@@ -81,7 +92,7 @@ namespace NeuralNetwork
 
             Parallel.For(0, Layer.NumPrevFeatureMaps, k =>
             {
-                if (Layer.FMIsConnectedToPrevFM(index, k))
+                if (Layer.FMIsConnectedToPrevFM(Index, k))
                 {
                     //pixel 0 of the next layer feature map associated with the current kernel
                     int nextNodeIndexFMBase = k * nextFeatureMapWidth * nextFeatureMapWidth;
@@ -100,7 +111,8 @@ namespace NeuralNetwork
                             {
                                 for (int kx = 0; kx < Layer.KernelWidth; kx++)
                                 {
-                                    KernelWeightGradents[k * Layer.KernelWidth * Layer.KernelWidth + kx + ky * Layer.KernelWidth] += dErrY * nextOutputs[nextNodeIndexBase + kx + ky * nextFeatureMapWidth];
+                                    //KernelWeightGradents[k * Layer.KernelWidth * Layer.KernelWidth + kx + ky * Layer.KernelWidth] += dErrY * nextOutputs[nextNodeIndexBase + kx + ky * nextFeatureMapWidth];
+                                    Layer.WeightGradients[Index * Layer.NumWeightsPerFeatureMap + k * Layer.KernelWidth * Layer.KernelWidth + kx + ky * Layer.KernelWidth] += dErrY * nextOutputs[nextNodeIndexBase + kx + ky * nextFeatureMapWidth];
                                 }
                             }
                         }
@@ -108,35 +120,39 @@ namespace NeuralNetwork
                 }
             });
 
-            if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
-            {
-                Parallel.For(0, Layer.NumPrevFeatureMaps, i =>
-                {
-                    if (Layer.FMIsConnectedToPrevFM(index, i))
-                    {
-                        for (int j = 0; j < Layer.KernelWidth * Layer.KernelWidth; j++)
-                        {
-                            //Weight decay
-                            KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j] -= weightDecay * learningRate * KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j];
+            //if (miniBatchMode == MiniBatchMode.Off || miniBatchMode == MiniBatchMode.Compute)
+            //{
+            //    Parallel.For(0, Layer.NumPrevFeatureMaps, i =>
+            //    {
+            //        if (Layer.FMIsConnectedToPrevFM(index, i))
+            //        {
+            //            for (int j = 0; j < Layer.KernelWidth * Layer.KernelWidth; j++)
+            //            {
+            //                //Weight decay
+            //                KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j] -= weightDecay * learningRate * KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j];
 
-                            KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += learningRate * KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
+            //                KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += learningRate * KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
 
-                            //Add momentum
-                            KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += momentum * PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j];
-                            PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j] = KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
-                        }
-                    }
-                });
-            }
+            //                //Add momentum
+            //                KernelWeights[i * Layer.KernelWidth * Layer.KernelWidth + j] += momentum * PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j];
+            //                PrevKernelWeightGradients[i * Layer.KernelWidth * Layer.KernelWidth + j] = KernelWeightGradents[i * Layer.KernelWidth * Layer.KernelWidth + j];
+            //            }
+            //        }
+            //    });
+            //}
         }
 
         public void RandomizeWeights(Random rand)
         {
             Bias = rand.NextDouble() * 2 - 1;
 
+            //Fan-in for kernel weight is # of pixels in feature map
+            int fanIn = Layer.FeatureMapWidth * Layer.FeatureMapWidth;
+
             for (int i = 0; i < Layer.NumPrevFeatureMaps * Layer.KernelWidth * Layer.KernelWidth; i++)
             {
-                KernelWeights[i] = rand.NextDouble() * 2 - 1;
+                //KernelWeights[i] = (rand.NextDouble() * 2 - 1) * (1.0 / Math.Sqrt(fanIn));
+                Layer.Weights[Index * Layer.NumWeightsPerFeatureMap + i] = (rand.NextDouble() * 2 - 1) * (1.0 / Math.Sqrt(fanIn));
             }
         }
 

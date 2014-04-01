@@ -4,9 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Xml.Serialization;
 using System.IO;
+using NeuralNetwork.Layers;
+using NeuralNetwork.Utils;
+using NeuralNetwork.DataSetProviders;
 
 namespace NeuralNetwork
 {
+    public enum LearningMethod
+    {
+        SGD = 0,
+        RMSPROP = 1
+    }
+
     public enum MiniBatchMode
     {
         Off = 0,
@@ -19,32 +28,32 @@ namespace NeuralNetwork
     public class NeuralNetwork
     {
         public string Name;
+
         public InputLayer InputLayer;
 
-        [XmlArrayItem(Type = typeof(HiddenLayer)),
+        [XmlArrayItem(Type = typeof(FullyConnectedLayer)),
          XmlArrayItem(Type = typeof(ConvolutionalLayer))]
         public List<HiddenLayer> HiddenLayers; //index 0 is closest to input
 
         public OutputLayer OutputLayer;
-        
-        public double LearningRate;
-        
-        private Random m_Rand;
 
-        private const double MOMENTUM = 0.5;
-        private const double WEIGHT_DECAY = 0.0;
+        public LearningMethod LearningMethod;
+        public double LearningRate;
+        public double Momentum;
+        public double WeightDecay;
+
+        private Random m_Rand;
 
         //So serialization works
         public NeuralNetwork() { }
 
-        public NeuralNetwork(string networkName, InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer, double learningRate)
+        public NeuralNetwork(IDataSetProvider dataSetProvider, string networkName, InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer/*, double learningRate, double momentum, double weightDecay*/)
         {
             Name = networkName;
             InputLayer = inputLayer;
             HiddenLayers = hiddenLayers;
             OutputLayer = outputLayer;
-            LearningRate = learningRate;
-
+            
             m_Rand = new Random(DateTime.Now.Millisecond);
 
             Init();
@@ -95,15 +104,12 @@ namespace NeuralNetwork
             return OutputLayer.Evaluate(result);
         }
 
-        /*
-         * Trains the neural network using the given training example. ("Online" training)
-         */
         public double Train(TrainingExample example, MiniBatchMode miniBatchMode = MiniBatchMode.Off)
         {
             double[] actual = GetResult(example.Input);
 
             //Output nodes
-            double error = OutputLayer.Backpropagate(actual, example.Expected, HiddenLayers.Last().Outputs, LearningRate, MOMENTUM, WEIGHT_DECAY, miniBatchMode);
+            double error = OutputLayer.Backpropagate(LearningMethod, actual, example.Expected, HiddenLayers.Last().Outputs, LearningRate, Momentum, WeightDecay, miniBatchMode);
 
             Layer previous = OutputLayer;
 
@@ -113,7 +119,7 @@ namespace NeuralNetwork
                 Layer layer = HiddenLayers[i];
                 Layer next = (i == 0 ? (Layer)InputLayer : (Layer)HiddenLayers[i - 1]);
 
-                layer.Backpropagate(previous, next, LearningRate, MOMENTUM, WEIGHT_DECAY, miniBatchMode);
+                layer.Backpropagate(LearningMethod, previous, next, LearningRate, Momentum, WeightDecay, miniBatchMode);
 
                 previous = layer;
             }
@@ -121,19 +127,21 @@ namespace NeuralNetwork
             return error;
         }
 
-        public void SaveToDisk(string directory)
+        public void SaveToDisk(string path)
         {
-            Serialization.SerializeObject<NeuralNetwork>(this, Path.Combine(directory, Name + ".xml"));
+            Serialization.SerializeObject<NeuralNetwork>(this, path);
         }
 
-        public void LoadFromDisk(string directory)
+        public void LoadFromDisk(string path)
         {
-            NeuralNetwork temp = Serialization.DeSerializeObject<NeuralNetwork>(Path.Combine(directory, Name + ".xml"));
+            NeuralNetwork temp = Serialization.DeSerializeObject<NeuralNetwork>(path);
 
             this.InputLayer = temp.InputLayer;
             this.HiddenLayers = temp.HiddenLayers;
             this.OutputLayer = temp.OutputLayer;
             this.LearningRate = temp.LearningRate;
+            this.Momentum = temp.Momentum;
+            this.WeightDecay = temp.WeightDecay;
 
             foreach (HiddenLayer layer in HiddenLayers)
             {
@@ -146,57 +154,6 @@ namespace NeuralNetwork
                     }
                 }
             }
-        }
-
-        public void DisplayNetwork()
-        {
-            Console.WriteLine("\n::OUTPUT LAYER::\n");
-            for (int i = 0; i < OutputLayer.NumNodes; i++)
-            {
-                Console.WriteLine("OUTPUT NODE " + (i + 1));
-                Console.WriteLine("OUTPUT: " + Math.Round(OutputLayer.Outputs[i], 3, MidpointRounding.AwayFromZero));
-                Console.Write("WEIGHTS: ");
-                for (int j = 0; j < OutputLayer.NumWeightsPerNode; j++)
-                {
-                    Console.Write(Math.Round(OutputLayer.Weights[i * OutputLayer.NumWeightsPerNode + j], 3, MidpointRounding.AwayFromZero) + " ");
-                }
-                Console.Write("\nGRADIENTS: ");
-                for (int j = 0; j < OutputLayer.NumWeightsPerNode; j++)
-                {
-                    Console.Write(Math.Round(OutputLayer.WeightGradients[i * OutputLayer.NumWeightsPerNode + j], 3, MidpointRounding.AwayFromZero) + " ");
-                }
-                Console.WriteLine("\n");
-            }
-
-            for (int k = HiddenLayers.Count - 1; k >= 0; k--)
-            {
-                HiddenLayer layer = HiddenLayers[k];
-                Console.WriteLine("\n::HIDDEN LAYER " + (k + 1) + "::\n");
-                for (int i = 0; i < layer.NumNodes; i++)
-                {
-                    Console.WriteLine("HIDDEN NODE " + (i + 1));
-                    Console.WriteLine("OUTPUT: " + Math.Round(layer.Outputs[i], 3, MidpointRounding.AwayFromZero));
-                    Console.Write("WEIGHTS: ");
-                    for (int j = 0; j < layer.NumWeightsPerNode; j++)
-                    {
-                        Console.Write(Math.Round(layer.Weights[i * layer.NumWeightsPerNode + j], 3, MidpointRounding.AwayFromZero) + " ");
-                    }
-                    Console.Write("\nGRADIENTS: ");
-                    for (int j = 0; j < layer.NumWeightsPerNode; j++)
-                    {
-                        Console.Write(Math.Round(layer.WeightGradients[i * layer.NumWeightsPerNode + j], 3, MidpointRounding.AwayFromZero) + " ");
-                    }
-                    Console.WriteLine("\n");
-                }
-            }
-
-            Console.WriteLine("\n::INPUT LAYER::\n");
-            Console.WriteLine("OUTPUTS (INPUTS):");
-            for (int i = 0; i < InputLayer.NumNodes; i++)
-            {
-                Console.Write(Math.Round(InputLayer.Outputs[i], 3, MidpointRounding.AwayFromZero) + " ");
-            }
-            Console.WriteLine("\n");
         }
     }
 }

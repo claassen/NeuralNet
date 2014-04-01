@@ -1,4 +1,4 @@
-c:\users\mclaassen\documents\visual studio 2010\Projects\NeuralNetwork\NeuralNetwork\bin\Debug\NeuralNetwork.exe
-c:\users\mclaassen\documents\visual studio 2010\Projects\NeuralNetwork\NeuralNetwork\bin\Debug\NeuralNetwork.pdb
-c:\users\mclaassen\documents\visual studio 2010\Projects\NeuralNetwork\NeuralNetwork\obj\x86\Debug\NeuralNetwork.exe
-c:\users\mclaassen\documents\visual studio 2010\Projects\NeuralNetwork\NeuralNetwork\obj\x86\Debug\NeuralNetwork.pdb
+C:\Users\mclaassen\Documents\Visual Studio 2010\Projects\NeuralNetwork\NeuralNetwork\bin\Debug\NeuralNetwork.dll
+C:\Users\mclaassen\Documents\Visual Studio 2010\Projects\NeuralNetwork\NeuralNetwork\bin\Debug\NeuralNetwork.pdb
+C:\Users\mclaassen\Documents\Visual Studio 2010\Projects\NeuralNetwork\NeuralNetwork\obj\x86\Debug\NeuralNetwork.dll
+C:\Users\mclaassen\Documents\Visual Studio 2010\Projects\NeuralNetwork\NeuralNetwork\obj\x86\Debug\NeuralNetwork.pdb

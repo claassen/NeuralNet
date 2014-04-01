@@ -9,6 +9,10 @@ using System.Windows.Forms;
 using NeuralNetwork;
 using System.Runtime.InteropServices;
 using System.Threading;
+using NeuralNetwork.DataSetProviders;
+using NeuralNetwork.Layers;
+using NeuralNetwork.Functions;
+using NeuralNetwork.Utils;
 
 namespace NetworkVisualizer
 {
@@ -20,13 +24,14 @@ namespace NetworkVisualizer
         private FlowLayoutPanel[] layerPanels;
         private PictureBox[][] featureMapImages;
 
-        private ITrainingSetProvider provider;
+        private IDataSetProvider provider;
         private List<TrainingExample> testingExamples;
         private TrainingExample testExample;
 
-        private int textExampleIndex = 0;
+        private int testExampleIndex = 0;
 
         private ManualResetEvent evt = new ManualResetEvent(false);
+        private bool DisplayUpdateInProgress;
        
         public MainWindow()
         {
@@ -41,16 +46,17 @@ namespace NetworkVisualizer
         {
             StopButton.Enabled = false;
 
-            ITrainingSetProvider trainingSetProvider = new MNISTTrainingSetProvider();
+            IDataSetProvider trainingSetProvider = new MNISTDataSetProvider();
             provider = trainingSetProvider;
 
             testingExamples = trainingSetProvider.GetTestingExamples();
 
-            testExample = testingExamples[textExampleIndex];
+            testExample = testingExamples[testExampleIndex];
 
-            m_Manager = new NetworkManager("testnet4",
+            NeuralNetwork.NeuralNetwork network = new NeuralNetwork.NeuralNetwork(
                                            trainingSetProvider,
-                                           new InputLayer(28 * 28),
+                                           "testnet5",
+                                           new InputLayer(trainingSetProvider),
                                            new List<HiddenLayer>()
                                            {
                                                //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 20, 1), 
@@ -58,14 +64,35 @@ namespace NetworkVisualizer
                                                //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 2),
                                                //new HiddenLayer(ActivationFunctionType.Tanh, 300)
 
-                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 2, 10, 2), 
-                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2), 
-                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 1),
-                                               new HiddenLayer(ActivationFunctionType.Tanh, 800)
-                                           },
-                                           new OutputLayer(ActivationFunctionType.Softmax, 10),
-                                           0.0005);
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 3, 6, 2, true, 0.5), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 16, 2, true, 0.5), 
+                                               //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2, true, 0.5),
+                                               new FullyConnectedLayer(ActivationFunctionType.Tanh, 300)
 
+                                               //new HiddenLayer(ActivationFunctionType.Tanh, 800)
+                                           },
+                                           new OutputLayer(ActivationFunctionType.Softmax, 10));
+
+            //m_Manager = new NetworkManager("testnet4",
+            //                               trainingSetProvider,
+            //                               new InputLayer(28 * 28),
+            //                               new List<HiddenLayer>()
+            //                               {
+            //                                   //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 20, 1), 
+            //                                   //new ConvolutionalLayer(ActivationFunctionType.Tanh, 4, 60, 2), 
+            //                                   //new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 2),
+            //                                   //new HiddenLayer(ActivationFunctionType.Tanh, 300)
+
+            //                                   new ConvolutionalLayer(ActivationFunctionType.Tanh, 2, 10, 2), 
+            //                                   new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 60, 2), 
+            //                                   new ConvolutionalLayer(ActivationFunctionType.Tanh, 5, 120, 1),
+            //                                   new HiddenLayer(ActivationFunctionType.Tanh, 500)
+
+            //                                   //new HiddenLayer(ActivationFunctionType.Tanh, 800)
+            //                               },
+            //                               new OutputLayer(ActivationFunctionType.Softmax, 10),
+            //                               0.05);
+            m_Manager = new NetworkManager(network, LearningMethod.SGD, 0.001, 0.4, 0);
 
             SetupDisplay();
         }
@@ -105,7 +132,7 @@ namespace NetworkVisualizer
 
             m_Worker.DoWork += new DoWorkEventHandler((o, args) =>
             {
-                m_Manager.TrainNetwork(trainingIters, loadPrev, useAdaptiveLearningRate, useMiniBatch, (network, error) =>
+                m_Manager.TrainNetwork(trainingIters, useAdaptiveLearningRate, useMiniBatch, 1, (network, error) =>
                 {
                     if (m_Worker.CancellationPending)
                     {
@@ -126,7 +153,7 @@ namespace NetworkVisualizer
                             lblAvgError.Text = "" + avgError;
                         }));
 
-                        UpdateDisplay(testExample.Input, "");
+                        UpdateDisplay(testExample.Input);
                     }
 
                     if (epoch % 10 == 0)
@@ -179,7 +206,7 @@ namespace NetworkVisualizer
             {
                 try
                 {
-                    m_Manager.TestNetwork((double[] input, double[] result, double[] expected) =>
+                    m_Manager.TestNetwork((NeuralNetwork.NeuralNetwork network, double[] input, double[] result, double[] expected) =>
                     {
                         if (m_Worker.CancellationPending)
                         {
@@ -211,7 +238,7 @@ namespace NetworkVisualizer
                         if (now.Subtract(last).Seconds > 1)
                         {
                             last = now;
-                            UpdateDisplay(input, guess.ToString());
+                            UpdateDisplay(input);
                         }
 
                         return true;
@@ -275,63 +302,81 @@ namespace NetworkVisualizer
                 flowLayoutPanel.Controls.Add(layerPanels[i]);
             }
 
-            pictureBox1.Image = Helpers.ImageFromDoubleArray(testExample.Input, 48, 48);
-            UpdateDisplay(testExample.Input, "");
+            pictureBox1.Image = Helpers.ImageFromDoubleArray(testExample.Input);
+            UpdateDisplay(testExample.Input);
         }
 
-        private void UpdateDisplay(double[] input, string guess)
+        private void UpdateDisplay(double[] input)
         {
-            lock (this)
+            //Necessary because this function is called in a loop but is also triggered by back and prev buttons
+            if (!DisplayUpdateInProgress)
             {
-                List<ConvolutionalLayer> convLayers = m_Manager.GetNetwork().HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
-
-                m_Manager.GetNetwork().GetResult(input);
-
-                evt.Reset();
-
-                Action uiThreadWork = new Action(() =>
+                lock (this)
                 {
-                    pictureBox1.Image = Helpers.ImageFromDoubleArray(input, 28, 28);
-                    label1.Text = guess;
-
-                    for (int i = 0; i < layerPanels.Length; i++)
+                    if (!DisplayUpdateInProgress)
                     {
-                        for (int j = 0; j < featureMapImages[i].Length; j++)
+                        DisplayUpdateInProgress = true;
+
+                        List<ConvolutionalLayer> convLayers = m_Manager.GetNetwork().HiddenLayers.Where(l => l is ConvolutionalLayer).Select(l => (ConvolutionalLayer)l).ToList();
+
+                        int guess = Helpers.GetMaxValueIndex(m_Manager.GetNetwork().GetResult(input));
+
+                        evt.Reset();
+
+                        Action uiThreadWork = new Action(() =>
                         {
-                            if (featureMapImages[i][j].Image != null)
+                            pictureBox1.Image = Helpers.ImageFromDoubleArray(input);
+                            label1.Text = guess.ToString();
+
+                            for (int i = 0; i < layerPanels.Length; i++)
                             {
-                                featureMapImages[i][j].Image.Dispose();
+                                for (int j = 0; j < featureMapImages[i].Length; j++)
+                                {
+                                    if (featureMapImages[i][j].Image != null)
+                                    {
+                                        featureMapImages[i][j].Image.Dispose();
+                                    }
+                                    featureMapImages[i][j].Image = Helpers.ImageFromDoubleArray(convLayers[i].FeatureMaps[j].Output.Select(v => (v + 1) * (255 / 2)).ToArray());
+                                }
                             }
-                            featureMapImages[i][j].Image = Helpers.ImageFromDoubleArray(convLayers[i].FeatureMaps[j].Output, 44, 44);
+
+                            evt.Set();
+                        });
+
+                        if (this.InvokeRequired)
+                        {
+                            this.BeginInvoke(uiThreadWork);
                         }
+                        else
+                        {
+                            uiThreadWork();
+                        }
+
+                        //Wait for the UI thread work to finish before returning
+                        evt.WaitOne();
+
+                        DisplayUpdateInProgress = false;
                     }
-
-                    evt.Set();
-                });
-
-                if (this.InvokeRequired)
-                {
-                    this.BeginInvoke(uiThreadWork);
                 }
-                else
-                {
-                    uiThreadWork();
-                }
-
-                evt.WaitOne();
             }
         }
 
         private void prevButton_Click(object sender, EventArgs e)
         {
-            testExample = testingExamples[textExampleIndex--];
-            UpdateDisplay(testExample.Input, "");
+            if (testExampleIndex > 0)
+            {
+                testExample = testingExamples[--testExampleIndex];
+                UpdateDisplay(testExample.Input);
+            }
         }
 
         private void nextButton_Click(object sender, EventArgs e)
         {
-            testExample = testingExamples[textExampleIndex++];
-            UpdateDisplay(testExample.Input, "");
+            if (testExampleIndex < testingExamples.Count - 1)
+            {
+                testExample = testingExamples[++testExampleIndex];
+                UpdateDisplay(testExample.Input);
+            }
         }
     }
 }

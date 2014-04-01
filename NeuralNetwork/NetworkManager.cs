@@ -2,24 +2,29 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using NeuralNetwork.DataSetProviders;
+using NeuralNetwork.Layers;
 
 namespace NeuralNetwork
 {
     public class NetworkManager
     {
-        private ITrainingSetProvider m_TrainingSetProvider;
         private List<TrainingExample> m_TrainingExamples;
         private List<TrainingExample> m_TestingExamples;
         private NeuralNetwork m_Network;
         private Random m_Rand;
 
-        public NetworkManager(string networkName, ITrainingSetProvider trainingSetProvider, InputLayer inputLayer, List<HiddenLayer> hiddenLayers, OutputLayer outputLayer, double learningRate = 0.25)
+        public NetworkManager(NeuralNetwork network, LearningMethod learningMethod, double learningRate, double momentum, double weightDecay)
         {
-            m_TrainingSetProvider = trainingSetProvider;
-            m_TrainingExamples = trainingSetProvider.GetTrainingExamples();
-            m_TestingExamples = trainingSetProvider.GetTestingExamples();
+            m_TrainingExamples = network.InputLayer.DataSetProvider.GetTrainingExamples();
+            m_TestingExamples = network.InputLayer.DataSetProvider.GetTestingExamples();
 
-            m_Network = new NeuralNetwork(networkName, inputLayer, hiddenLayers, outputLayer, learningRate);
+            m_Network = network;
+
+            m_Network.LearningRate = learningRate;
+            m_Network.Momentum = momentum;
+            m_Network.WeightDecay = weightDecay;
+            m_Network.LearningMethod = learningMethod;
 
             m_Rand = new Random(DateTime.Now.Millisecond);
         }
@@ -39,15 +44,8 @@ namespace NeuralNetwork
             return m_TestingExamples[m_Rand.Next(m_TestingExamples.Count)];
         }
 
-        public void TrainNetwork(long iterations, bool loadPrevious, bool useAdaptiveLearningRate, bool useMiniBatch, Func<NeuralNetwork, double, bool> onTrain = null)
+        public void TrainNetwork(long iterations, bool useAdaptiveLearningRate, bool useMiniBatch, int miniBatchSize, Func<NeuralNetwork, double, bool> onTrain = null)
         {
-            if (loadPrevious)
-            {
-                m_Network.LoadFromDisk("C:\\nets");
-            }
-
-            int miniBatchSize = 100;
-
             if (!useAdaptiveLearningRate)
             {
                 for (long i = 0; i < iterations; i++)
@@ -170,12 +168,7 @@ namespace NeuralNetwork
             return m_Network.Train(GetRandomTrainingExample(), MiniBatchMode.Compute);
         }
 
-        public void ShowNetwork()
-        {
-            m_Network.DisplayNetwork();
-        }
-
-        public double TestNetwork(Func<double[], double[], double[], bool> onTest = null, int maxIterations = 0)
+        public double TestNetwork(Func<NeuralNetwork, double[], double[], double[], bool> onTest = null, int maxIterations = 0)
         {
             double error = 0;
             
@@ -197,7 +190,7 @@ namespace NeuralNetwork
 
                 if (null != onTest)
                 {
-                    if (!onTest(example.Input, result, example.Expected))
+                    if (!onTest(m_Network, example.Input, result, example.Expected))
                     {
                         //onTest returns false to indicate testing should be stopped
                         return error;

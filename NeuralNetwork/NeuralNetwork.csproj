@@ -6,7 +6,7 @@
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{DFACA8B8-4E84-4440-AEC4-C655B147D892}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>NeuralNetwork</RootNamespace>
     <AssemblyName>NeuralNetwork</AssemblyName>
@@ -33,6 +33,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -44,18 +47,27 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ActivationFunctions.cs" />
-    <Compile Include="ErrorFunctions.cs" />
+    <Compile Include="Functions\ActivationFunctions.cs" />
+    <Compile Include="DataSetProviders\BinaryOpProviders.cs" />
+    <Compile Include="DataSetProviders\EvenOrOddDataSetProvider.cs" />
+    <Compile Include="DataSetProviders\MNISTDataSetProvider.cs" />
+    <Compile Include="DataSetProviders\SinFunctionDataSetProvider.cs" />
+    <Compile Include="Functions\ErrorFunctions.cs" />
     <Compile Include="FeatureMap.cs" />
-    <Compile Include="Helpers.cs" />
-    <Compile Include="Layer.cs" />
+    <Compile Include="Layers\FullyConnectedLayer.cs" />
+    <Compile Include="Utils\Helpers.cs" />
+    <Compile Include="Layers\ConvolutionalLayer.cs" />
+    <Compile Include="Layers\HiddenLayer.cs" />
+    <Compile Include="Layers\InputLayer.cs" />
+    <Compile Include="Layers\Layer.cs" />
+    <Compile Include="Layers\OutputLayer.cs" />
     <Compile Include="NetworkManager.cs" />
     <Compile Include="NeuralNetwork.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="Program_obsolete.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Serialization.cs" />
+    <Compile Include="Utils\Serialization.cs" />
     <Compile Include="TrainingExample.cs" />
-    <Compile Include="TrainingExampleProvider.cs" />
+    <Compile Include="DataSetProviders\IDataSetProvider.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
